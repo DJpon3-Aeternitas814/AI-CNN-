@@ -144,23 +144,41 @@ def train_epoch(model, device, train_loader, optimizer, criterion, epoch):
     return avg_loss
 
 # 测试一个epoch
+# 测试一个epoch（升级版：同时计算 Top-1 和 Top-5 准确率）
 def test_epoch(model, device, test_loader, criterion):
     model.eval()  # 切换到评估模式
     test_loss = 0
-    correct = 0
+    correct_top1 = 0
+    correct_top5 = 0  # 🌟 新增：记录 Top-5 猜对的数量
+    total_samples = 0  # 🌟 新增：记录总样本数
+    
     with torch.no_grad():  # 不计算梯度
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
             output = model(data)
+            
             test_loss += criterion(output, target).item()  # 累加损失
-            pred = output.argmax(dim=1, keepdim=True)      # 获取预测类别
-            correct += pred.eq(target.view_as(pred)).sum().item()  # 统计正确预测的数量
+            total_samples += target.size(0)               # 累加当前 batch 的样本数
+            
+            # --- 第 23 题核心：Top-1 预测 ---
+            pred = output.argmax(dim=1, keepdim=True)      
+            correct_top1 += pred.eq(target.view_as(pred)).sum().item()
+            
+            # --- 第 24 题核心：Top-5 预测 ---
+            # torch.topk 会返回前 5 个最大的预测得分及其对应的数字类别索引
+            _, pred_top5 = output.topk(5, dim=1, largest=True, sorted=True)
+            # target.view(-1, 1) 把标签变成列向量，只要真实标签在 pred_top5 的某一行中，就说明前5次里猜中了
+            correct_top5 += (pred_top5 == target.view(-1, 1)).sum().item()
 
     test_loss /= len(test_loader)
-    accuracy = 100. * correct / len(test_loader.dataset)  # 计算准确率
     
-    return test_loss, accuracy  #返回测试损失和准确率
+    # 计算各自的准确率
+    accuracy_top1 = 100. * correct_top1 / total_samples
+    accuracy_top5 = 100. * correct_top5 / total_samples  # 🌟 计算 Top-5 准确率
+    
+    return test_loss, accuracy_top1, accuracy_top5  # 🌟 返回三个指标
 
+# 主函数
 # 主函数
 def main():
     modelpath = "./model"
@@ -168,7 +186,7 @@ def main():
         print("模型目录不存在，将自动新建！")
         os.makedirs(modelpath, exist_ok=True)
 
-    # 初始化设备（优先使用GPU，否则使用CPU）
+    # 初始化设备
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # 加载数据
     train_loader, test_loader = load_data(batch_size=64)
@@ -176,22 +194,26 @@ def main():
     model = CNN().to(device)
     
     # 初始化训练组件
-    criterion = nn.CrossEntropyLoss()  # 使用交叉熵损失函数
-    optimizer = optim.Adam(model.parameters(), lr=0.001)  # 使用Adam优化器
-    # 训练参数
-    epochs = 10  # 总共训练10个epoch
+    criterion = nn.CrossEntropyLoss()  
+    optimizer = optim.Adam(model.parameters(), lr=0.001)  
+    
+    epochs = 3  # 总共训练3个epoch
     
     # 开始训练和测试
     for epoch in range(1, epochs + 1):
-        print(f"\nEpoch {epoch}/{epochs}")
+        print(f"\n" + "="*15 + f" Epoch {epoch}/{epochs} " + "="*15)
         train_loss = train_epoch(model, device, train_loader, optimizer, criterion, epoch)
-        test_loss, accuracy = test_epoch(model, device, test_loader, criterion)
         
-        print(f"Train Loss: {train_loss:.4f}")
-        print(f"Test Loss: {test_loss:.4f}, Accuracy: {accuracy:.2f}%")
+        # 🌟 接收 test_epoch 返回的三个变量
+        test_loss, accuracy_top1, accuracy_top5 = test_epoch(model, device, test_loader, criterion)
+        
+        print(f"📊 训练表现 -> Train Loss: {train_loss:.4f}")
+        print(f"📉 测试表现 -> Test Loss:  {test_loss:.4f}")
+        print(f"🎯 第22&23题 -> Top-1 Accuracy (标准准确率): {accuracy_top1:.2f}%")
+        print(f"🎯 第24题    -> Top-5 Accuracy (宽容准确率): {accuracy_top5:.2f}%")
 
     modelname = "mnist_cnn.pth"
-    print(f"模型保存于{modelpath}， 名称{modelname}")
+    print(f"\n💾 训练结束，模型保存于: {modelpath}/{modelname}")
     torch.save(model.state_dict(), os.path.join(modelpath, modelname))
 
 if __name__ == '__main__':
