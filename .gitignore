@@ -1,0 +1,19 @@
+# 忽略 Python 的临时缓存
+__pycache__/
+*.pyc
+
+# 忽略训练保存的模型文件（比如你的 mnist_cnn.pth）
+*.pth
+*.pkl
+model/
+
+# 忽略数据集和需要读取的数据文件（根据你的实际情况修改文件夹名）
+# 假设你的数据放在名为 data 或 datasets 的文件夹里：
+data/
+datasets/
+*.zip
+*.tar.gz
+*.csv
+
+# 如果有些大文件就在根目录下，可以直接写文件名
+# 比如：你的大文件名.csv
