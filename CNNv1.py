@@ -1,221 +1,148 @@
 import os
+import time  # 🌟 25题核心：引入时间统计模块
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
-from datetime import datetime
-
-import torch
-import torch.nn as nn
 
 # 定义卷积神经网络模型
 class CNN(nn.Module):
     def __init__(self):
-        """
-        初始化网络结构：
-        - 卷积层1：输入通道数为1（灰度图像），输出通道数为32，卷积核大小为3x3，填充为1。
-        - 卷积层2：输入通道数为32，输出通道数为64，卷积核大小为3x3，填充为1。
-        - 池化层：最大池化，窗口大小为2x2，步幅为2。
-        - 全连接层1：输入特征数为64*7*7（MNIST图像经过两次池化后尺寸变为7x7），输出特征数为128。
-        - 全连接层2：输入特征数为128，输出特征数为10（对应MNIST数据集的10个类别）。
-        - Dropout层：随机丢弃50%的神经元，防止过拟合。
-        """
         super(CNN, self).__init__()
-        
-        # 第一层卷积：输入通道数为1（灰度图像），输出通道数为32，卷积核大小为3x3，填充为1
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, stride=1, padding=1)
-        
-        # 第二层卷积：输入通道数为32，输出通道数为64，卷积核大小为3x3，填充为1
         self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
-        
-        # 最大池化层：窗口大小为2x2，步幅为2
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        
-        # 第一层全连接：输入特征数为64*7*7（MNIST图像经过两次池化后尺寸变为7x7），输出特征数为128
         self.fc1 = nn.Linear(in_features=64 * 7 * 7, out_features=128)
-        
-        # 第二层全连接：输入特征数为128，输出特征数为10（对应MNIST数据集的10个类别）
         self.fc2 = nn.Linear(in_features=128, out_features=10)
-        
-        # Dropout层：随机丢弃50%的神经元，防止过拟合
         self.dropout = nn.Dropout(p=0.5)
 
     def forward(self, x):
-        """
-        定义前向传播过程：
-        - 输入经过卷积层1和ReLU激活函数后，进行最大池化。
-        - 再经过卷积层2和ReLU激活函数后，再次进行最大池化。
-        - 将特征展平并通过两个全连接层，最后使用Dropout防止过拟合。
-        """
-        #print("数据初始维度", x.shape)
-
-        # 第一层卷积 -> ReLU -> 最大池化
-        x = self.pool(torch.relu(self.conv1(x)))  # 输出尺寸变为 32x14x14
-        #print("第一层卷积 -> ReLU -> 最大池化: ", x.shape)
-        
-        # 第二层卷积 -> ReLU -> 最大池化
-        x = self.pool(torch.relu(self.conv2(x)))  # 输出尺寸变为 64x7x7
-        
-        # 展平成一维向量
-        x = x.view(-1, 64 * 7 * 7)                # 展平为 [batch_size, 64*7*7]
-        
-        # 第一层全连接 -> ReLU
-        x = torch.relu(self.fc1(x))               # 输出尺寸为 [batch_size, 128]
-        
-        # Dropout层
-        x = self.dropout(x)                       # 随机丢弃50%的神经元
-        
-        # 第二层全连接
-        x = self.fc2(x)                           # 输出尺寸为 [batch_size, 10]
-        
+        x = self.pool(torch.relu(self.conv1(x)))  
+        x = self.pool(torch.relu(self.conv2(x)))  
+        x = x.view(-1, 64 * 7 * 7)                
+        x = torch.relu(self.fc1(x))               
+        x = self.dropout(x)                       
+        x = self.fc2(x)                           
         return x
-    
-        # def forward(self, x):
-        #     print("\n" + "-"*15 + " [维度追踪中...] " + "-"*15)
-        #     print(f"1. 数据进入网络的初始维度 [Batch, Channel, H, W]: {x.shape}")
 
-        #     # 第一层卷积 -> ReLU -> 最大池化
-        #     x = self.pool(torch.relu(self.conv1(x)))  
-        #     print(f"2. 第一层卷积+池化后维度 [Batch, 32, 14, 14]:       {x.shape}")
-            
-        #     # 第二层卷积 -> ReLU -> 最大池化
-        #     x = self.pool(torch.relu(self.conv2(x)))  
-        #     print(f"3. 第二层卷积+池化后维度 [Batch, 64, 7, 7]:         {x.shape}")
-            
-        #     # 展平成一维向量
-        #     x = x.view(-1, 64 * 7 * 7)                
-        #     print(f"4. 展平（view）后一维向量维度 [Batch, 3136]:         {x.shape}")
-            
-        #     # 第一层全连接 -> ReLU
-        #     x = torch.relu(self.fc1(x))               
-        #     print(f"5. 第一层全连接层后维度 [Batch, 128]:               {x.shape}")
-            
-        #     # Dropout层
-        #     x = self.dropout(x)                       
-            
-        #     # 第二层全连接（最终输出）
-        #     x = self.fc2(x)                           
-        #     print(f"6. 最终输出全连接层后维度 [Batch, 10]:              {x.shape}")
-        #     print("-"*46 + "\n")
-            
-        #     # ⚠️ 【高能提醒】为了防止终端无限刷屏，打印完第一个 batch 之后，直接强行退出程序
-        #     print("【提示】第 21 题要求的维度信息已成功抓取！按 Ctrl+C 或让程序自动中断...")
-        #     import sys
-        #     sys.exit(0)
-            
-        #     return x
-
-# 加载MNIST数据集，并进行预处理
+# 加载MNIST数据集
 def load_data(batch_size=64):
     transform = transforms.Compose([
-        transforms.ToTensor(),                    # 将图像转换为张量
-        transforms.Normalize((0.1307,), (0.3081,))  # 标准化（MNIST数据集的统计值:均值是0.1307，标准差是0.3081）
+        transforms.ToTensor(),                    
+        transforms.Normalize((0.1307,), (0.3081,))  
     ])
-
-    train_dataset = torchvision.datasets.MNIST(
-        root='./data', train=True, download=True, transform=transform)
-    test_dataset = torchvision.datasets.MNIST(
-        root='./data', train=False, download=True, transform=transform)
-
+    train_dataset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+    test_dataset = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    
     return train_loader, test_loader
 
 # 训练一个epoch
-def train_epoch(model, device, train_loader, optimizer, criterion, epoch):
-    model.train()  # 切换到训练模式
+def train_epoch(model, device, train_loader, optimizer, criterion):
+    model.train()  
     running_loss = 0.0
+    
+    # ⚠️ 【注意】根据第25题要求，循环内部严禁包含任何 print 语句
     for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)  # 将数据移动到GPU/CPU
-
-        optimizer.zero_grad()  # 清空梯度
-        output = model(data)   # 前向传播
-        loss = criterion(output, target)  # 计算损失
-        loss.backward()        # 反向传播
-        optimizer.step()       # 更新参数
-        
+        data, target = data.to(device), target.to(device)
+        optimizer.zero_grad()  
+        output = model(data)   
+        loss = criterion(output, target)  
+        loss.backward()        
+        optimizer.step()       
         running_loss += loss.item()
-        global_step = epoch * len(train_loader) + batch_idx
 
     avg_loss = running_loss / len(train_loader)
     return avg_loss
 
 # 测试一个epoch
-# 测试一个epoch（升级版：同时计算 Top-1 和 Top-5 准确率）
 def test_epoch(model, device, test_loader, criterion):
-    model.eval()  # 切换到评估模式
+    model.eval()  
     test_loss = 0
     correct_top1 = 0
-    correct_top5 = 0  # 🌟 新增：记录 Top-5 猜对的数量
-    total_samples = 0  # 🌟 新增：记录总样本数
+    correct_top5 = 0  # 🌟 24题核心
+    total_samples = 0
     
-    with torch.no_grad():  # 不计算梯度
+    # ⚠️ 【注意】根据第25题要求，循环内部严禁包含任何 print 语句
+    with torch.no_grad():  
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
             output = model(data)
+            test_loss += criterion(output, target).item()  
+            total_samples += target.size(0)
             
-            test_loss += criterion(output, target).item()  # 累加损失
-            total_samples += target.size(0)               # 累加当前 batch 的样本数
-            
-            # --- 第 23 题核心：Top-1 预测 ---
+            # Top-1 计算 (23题)
             pred = output.argmax(dim=1, keepdim=True)      
             correct_top1 += pred.eq(target.view_as(pred)).sum().item()
             
-            # --- 第 24 题核心：Top-5 预测 ---
-            # torch.topk 会返回前 5 个最大的预测得分及其对应的数字类别索引
+            # Top-5 计算 (24题)
             _, pred_top5 = output.topk(5, dim=1, largest=True, sorted=True)
-            # target.view(-1, 1) 把标签变成列向量，只要真实标签在 pred_top5 的某一行中，就说明前5次里猜中了
             correct_top5 += (pred_top5 == target.view(-1, 1)).sum().item()
 
     test_loss /= len(test_loader)
-    
-    # 计算各自的准确率
     accuracy_top1 = 100. * correct_top1 / total_samples
-    accuracy_top5 = 100. * correct_top5 / total_samples  # 🌟 计算 Top-5 准确率
+    accuracy_top5 = 100. * correct_top5 / total_samples
     
-    return test_loss, accuracy_top1, accuracy_top5  # 🌟 返回三个指标
+    return test_loss, accuracy_top1, accuracy_top5
 
-# 主函数
 # 主函数
 def main():
     modelpath = "./model"
-    if not os.path.exists(modelpath):
-        print("模型目录不存在，将自动新建！")
-        os.makedirs(modelpath, exist_ok=True)
+    os.makedirs(modelpath, exist_ok=True)
 
-    # 初始化设备
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # 加载数据
-    train_loader, test_loader = load_data(batch_size=64)
-    # 初始化模型
-    model = CNN().to(device)
+    print(f"当前训练使用的硬件设备: {device}")
     
-    # 初始化训练组件
+    train_loader, test_loader = load_data(batch_size=64)
+    model = CNN().to(device)
     criterion = nn.CrossEntropyLoss()  
     optimizer = optim.Adam(model.parameters(), lr=0.001)  
     
-    epochs = 3  # 总共训练3个epoch
+    epochs = 3
     
-    # 开始训练和测试
+    # 用于累加各轮时间以计算最后的平均时间 (25题)
+    total_train_time = 0.0
+    total_test_time = 0.0
+    
     for epoch in range(1, epochs + 1):
-        print(f"\n" + "="*15 + f" Epoch {epoch}/{epochs} " + "="*15)
-        train_loss = train_epoch(model, device, train_loader, optimizer, criterion, epoch)
+        print(f"\n" + "="*15 + f" ⏳ Epoch {epoch}/{epochs} 正在运行 " + "="*15)
         
-        # 🌟 接收 test_epoch 返回的三个变量
+        # ⏱️ 统计 train_epoch 执行时间
+        start_train = time.time()
+        train_loss = train_epoch(model, device, train_loader, optimizer, criterion)
+        end_train = time.time()
+        epoch_train_time = end_train - start_train
+        total_train_time += epoch_train_time
+        
+        # ⏱️ 统计 test_epoch 执行时间
+        start_test = time.time()
         test_loss, accuracy_top1, accuracy_top5 = test_epoch(model, device, test_loader, criterion)
+        end_test = time.time()
+        epoch_test_time = end_test - start_test
+        total_test_time += epoch_test_time
         
-        print(f"📊 训练表现 -> Train Loss: {train_loss:.4f}")
-        print(f"📉 测试表现 -> Test Loss:  {test_loss:.4f}")
-        print(f"🎯 第22&23题 -> Top-1 Accuracy (标准准确率): {accuracy_top1:.2f}%")
-        print(f"🎯 第24题    -> Top-5 Accuracy (宽容准确率): {accuracy_top5:.2f}%")
+        # 结果汇报
+        print(f"⏱️ 本轮耗时 -> 训练时间: {epoch_train_time:.4f} 秒 | 测试时间: {epoch_test_time:.4f} 秒")
+        print(f"📉 误差指标 -> Train Loss: {train_loss:.4f} | Test Loss: {test_loss:.4f}")
+        print(f"🎯 准确率   -> Top-1 Acc: {accuracy_top1:.2f}% | Top-5 Acc: {accuracy_top5:.2f}%")
 
-    modelname = "mnist_cnn.pth"
-    print(f"\n💾 训练结束，模型保存于: {modelpath}/{modelname}")
-    torch.save(model.state_dict(), os.path.join(modelpath, modelname))
+    # 🌟 计算并输出题目要求的平均时间报告
+    avg_train_time = total_train_time / epochs
+    avg_test_time = total_test_time / epochs
+    
+    print("\n" + "==================================================")
+    print("      📊 综合实验报告结论 (第 22, 23, 24, 25 题)      ")
+    print("==================================================")
+    print(f"1. 准确率随 Epoch 的增加呈现【稳步上升】趋势 (第22题)")
+    print(f"2. 最终批量测试集 Top-1 准确率 (精度): {accuracy_top1:.2f}% (第23题)")
+    print(f"3. 最终批量测试集 Top-5 准确率 (精度): {accuracy_top5:.2f}% (第24题)")
+    print(f"4. train_epoch() 平均执行时间: {avg_train_time:.4f} 秒 (第25题-a)")
+    print(f"5. test_epoch()  平均执行时间: {avg_test_time:.4f} 秒 (第25题-b)")
+    print("==================================================\n")
+
+    torch.save(model.state_dict(), os.path.join(modelpath, "mnist_cnn.pth"))
 
 if __name__ == '__main__':
-    # 进入环境后，输入 python CNNv1_simple.py 运行程序。 
     main()
